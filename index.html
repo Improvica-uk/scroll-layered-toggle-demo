@@ -2,25 +2,24 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <title>立ったリング＋低い位置からの強光＆長い影デモ</title>
+  <title>立ったリング＋明るめライティング＋長い影デモ</title>
   <style>
     body {
       margin: 0;
       overflow: hidden;
-      /* 背景グラデ */
-      background: linear-gradient(to bottom, #000000, #222222);
+      /* 背景を少し明るめのグラデーションに */
+      background: linear-gradient(to bottom, #444444, #888888);
     }
-    /* 地平線ライン（お好みで消せます） */
     #horizon {
       position: fixed;
       top: 50%;
       left: 0;
       width: 100%;
-      border-top: 1px solid #444;
+      border-top: 1px solid #555;
       pointer-events: none;
       z-index: 10;
     }
-    canvas { display:block; }
+    canvas { display: block; }
   </style>
 </head>
 <body>
@@ -29,33 +28,29 @@
   <script>
     // シーン＆レンダラー
     const scene    = new THREE.Scene();
-    const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type    = THREE.PCFSoftShadowMap;
+    renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
     window.addEventListener('resize', () => {
-      camera.aspect = window.innerWidth/window.innerHeight;
+      camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
     });
 
     // カメラ
     const camera = new THREE.PerspectiveCamera(
-      60, window.innerWidth/window.innerHeight, 0.1, 1000
+      60, window.innerWidth / window.innerHeight, 0.1, 1000
     );
     camera.position.set(0, 10, 30);
-    camera.lookAt(0,0,0);
+    camera.lookAt(0, 0, 0);
 
-    // 光源：アンビエント
-    scene.add(new THREE.AmbientLight(0xffffff, 0.3));
-
-    // 光源：低い位置からの強い方向光
-    const dir = new THREE.DirectionalLight(0xffffff, 2);
-    // 低い角度(高さ5)・横に振った位置
+    // ライティング
+    scene.add(new THREE.AmbientLight(0xffffff, 0.6)); // アンビエントを明るめに
+    const dir = new THREE.DirectionalLight(0xffffff, 1.5); // ディレクショナルも少し強め
     dir.position.set(30, 5, 30);
     dir.castShadow = true;
-    // 影カメラ範囲を十分に広く
     const d = 200;
     dir.shadow.camera.left   = -d;
     dir.shadow.camera.right  =  d;
@@ -67,9 +62,9 @@
     // 地面
     const ground = new THREE.Mesh(
       new THREE.PlaneGeometry(1000, 1000),
-      new THREE.MeshStandardMaterial({ color: 0x333333 })
+      new THREE.MeshStandardMaterial({ color: 0x555555 }) // 少し明るめ
     );
-    ground.rotation.x   = -Math.PI/2;
+    ground.rotation.x   = -Math.PI / 2;
     ground.position.y   = 0;
     ground.receiveShadow = true;
     scene.add(ground);
@@ -77,31 +72,30 @@
     // リング群パラメータ
     const ringCount = 500,
           spacing   = 25,
-          farZ      = - spacing * ringCount,
+          farZ      = -spacing * ringCount,
           majorR    = 5,
           tubeR     = 0.2,
           xRange    = 100,
           speed     = 0.5;
     const rings = [];
 
-    // リングジオメトリ＆マテリアル
+    // リングのジオメトリ＆マテリアル
     const geo = new THREE.TorusGeometry(majorR, tubeR, 16, 100);
     const mat = new THREE.MeshStandardMaterial({
-      color: 0x000000,
+      color: 0x222222, // 少し明るめの黒
       roughness: 0.5,
       metalness: 0.1
     });
 
-    // リング配置
     for (let i = 0; i < ringCount; i++) {
       const wheel = new THREE.Mesh(geo, mat);
-      wheel.rotation.x = Math.PI/2;       // 垂直に立てる
-      wheel.rotation.y = Math.PI/1.5;     // 軽く傾け
-      wheel.position.y = majorR + tubeR;  // 中心を少し上
-      wheel.position.z = - spacing*(i+1);
-      wheel.position.x = Math.random()*2*xRange - xRange;
-      wheel.castShadow    = true;         // 影を落とす
-      wheel.receiveShadow = false;
+      wheel.rotation.x = Math.PI / 2;
+      wheel.rotation.y = Math.PI / 1.5;
+      wheel.position.y = majorR + tubeR;
+      wheel.position.z = -spacing * (i + 1);
+      wheel.position.x = Math.random() * 2 * xRange - xRange;
+      wheel.castShadow = true;
+      wheel.receiveShadow = true;
       scene.add(wheel);
       rings.push(wheel);
     }
@@ -109,14 +103,14 @@
     // カメラ左右パン
     const maxPanX = xRange;
     window.addEventListener('mousemove', e => {
-      const xn = (e.clientX / window.innerWidth)*2 - 1;
+      const xn = (e.clientX / window.innerWidth) * 2 - 1;
       camera.position.x = xn * maxPanX;
-      camera.lookAt(0,0,0);
+      camera.lookAt(0, 0, 0);
     });
     window.addEventListener('touchmove', e => {
-      const xn = (e.touches[0].clientX / window.innerWidth)*2 - 1;
+      const xn = (e.touches[0].clientX / window.innerWidth) * 2 - 1;
       camera.position.x = xn * maxPanX;
-      camera.lookAt(0,0,0);
+      camera.lookAt(0, 0, 0);
     });
 
     // アニメーションループ
@@ -126,7 +120,7 @@
         w.position.z += speed;
         if (w.position.z > camera.position.z - 1) {
           w.position.z = farZ;
-          w.position.x = Math.random()*2*xRange - xRange;
+          w.position.x = Math.random() * 2 * xRange - xRange;
         }
       });
       renderer.render(scene, camera);
