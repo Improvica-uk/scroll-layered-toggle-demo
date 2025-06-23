@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <title>立ったリング＋固定地平線デモ（音付き）</title>
+  <title>立ったリング＋固定地平線デモ（サウンドなし）</title>
   <style>
     body { margin:0; overflow:hidden; }
     /* 地平線を画面中央に固定 */
@@ -22,37 +22,12 @@
   <div id="horizon"></div>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
   <script>
-    // ─── Web Audio API セットアップ ───
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    function beep() {
-      const osc  = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      osc.type = 'sine';
-      osc.frequency.value = 440;
-      gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-      osc.start();
-      osc.stop(audioCtx.currentTime + 0.1);
-    }
-    // ユーザー操作後でないと鳴らないブラウザがあるため、
-    // 最初のマウス操作でコンテキストを起動
-    window.addEventListener('click', ()=> {
-      if (audioCtx.state === 'suspended') audioCtx.resume();
-    }, { once: true });
-
-    // ─── Three.js セットアップ ───
+    // シーン＆レンダラー
     const scene    = new THREE.Scene();
     scene.background = new THREE.Color(0xffffff);
     const renderer = new THREE.WebGLRenderer({ antialias:true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
-
-    const camera = new THREE.PerspectiveCamera(
-      60, window.innerWidth/window.innerHeight, 0.1, 1000
-    );
-    camera.position.set(0, 10, 30);
-    camera.lookAt(0, 0, 0);
 
     window.addEventListener('resize', () => {
       camera.aspect = window.innerWidth/window.innerHeight;
@@ -60,46 +35,13 @@
       renderer.setSize(window.innerWidth, window.innerHeight);
     });
 
-    // ─── リング群パラメータ ───
-    const ringCount = 500,
-          spacing   = 25,
-          farZ      = - spacing * ringCount,
-          majorR    = 5,    // リングの“半径”
-          tubeR     = 0.2,  // リングの“厚み”
-          xRange    = 100,
-          speed     = 0.5;
-    const rings = [];
+    // カメラ（地平線を見据える）
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 10, 30);
+    camera.lookAt(0, 0, 0);
 
-    // ─── ジオメトリ & マテリアル ───
-    const geo = new THREE.TorusGeometry(majorR, tubeR, 16, 100);
-    const mat = new THREE.MeshBasicMaterial({ 
-      color:0x000000, 
-      side:THREE.DoubleSide 
-    });
-
-    // ─── リング作成 ───
-    for (let i = 0; i < ringCount; i++) {
-      const wheel = new THREE.Mesh(geo, mat);
-
-      // ★純粋に X 軸まわりに90°回転★
-      wheel.rotation.x = Math.PI / 2;
-      wheel.rotation.y = Math.PI / 1.5;
-
-      // 中心を地平線の少し上に配置
-      wheel.position.y = majorR + tubeR;
-
-      wheel.position.z = - spacing * (i + 1);
-      wheel.position.x = Math.random() * 2 * xRange - xRange;
-
-      // 通過判定用フラグ（初期は“地平線より上”とみなす）
-      wheel.userData.aboveHorizon = true;
-
-      scene.add(wheel);
-      rings.push(wheel);
-    }
-
-    // ─── カメラ左右パン ───
-    const maxPanX = xRange;
+    // 左右パンだけを許可
+    const maxPanX = 100;
     window.addEventListener('mousemove', e => {
       const xn = (e.clientX / window.innerWidth) * 2 - 1;
       camera.position.x = xn * maxPanX;
@@ -111,36 +53,48 @@
       camera.lookAt(0, 0, 0);
     });
 
-    // ─── スクリーン上での地平線判定準備 ───
-    const projV = new THREE.Vector3();
-    function aboveHorizon(mesh) {
-      // ワールド→NDCに投影し、y>0なら上半分
-      projV.copy(mesh.position).project(camera);
-      return projV.y > 0;
+    // リング群パラメータ
+    const ringCount = 500,
+          spacing   = 25,
+          farZ      = - spacing * ringCount,
+          majorR    = 5,    // リングの“半径”
+          tubeR     = 0.2,  // リングの“厚み”
+          xRange    = 100,
+          speed     = 0.5;
+    const rings = [];
+
+    // トーラスジオメトリ／マテリアル
+    const geo = new THREE.TorusGeometry(majorR, tubeR, 16, 100);
+    const mat = new THREE.MeshBasicMaterial({ color:0x000000, side:THREE.DoubleSide });
+
+    // リングを配置
+    for (let i = 0; i < ringCount; i++) {
+      const wheel = new THREE.Mesh(geo, mat);
+
+      // 純粋に X 軸まわりに90°回転 → 垂直に立てる
+      wheel.rotation.x = Math.PI / 2;
+      wheel.rotation.y = Math.PI / 1.5;
+
+      // 中心を地平線の少し上に配置
+      wheel.position.y = majorR + tubeR;
+
+      wheel.position.z = - spacing * (i + 1);
+      wheel.position.x = Math.random() * 2 * xRange - xRange;
+
+      scene.add(wheel);
+      rings.push(wheel);
     }
 
-    // ─── アニメーションループ ───
+    // アニメーションループ
     (function animate(){
       requestAnimationFrame(animate);
-
       rings.forEach(w => {
-        // 1) 前進・ループ
         w.position.z += speed;
         if (w.position.z > camera.position.z - 1) {
           w.position.z = farZ;
           w.position.x = Math.random() * 2 * xRange - xRange;
-          w.userData.aboveHorizon = true;
         }
-
-        // 2) 地平線通過判定
-        const nowAbove = aboveHorizon(w);
-        if (w.userData.aboveHorizon && !nowAbove) {
-          // 上→下に跨いだ瞬間にビープ
-          beep();
-        }
-        w.userData.aboveHorizon = nowAbove;
       });
-
       renderer.render(scene, camera);
     })();
   </script>
