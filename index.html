@@ -2,10 +2,10 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <title>Three.js – 地平線目線カメラ＋車輪リング</title>
+  <title>Three.js – 底面を地平線からずらした車輪リング</title>
   <style>
     body { margin:0; overflow:hidden; }
-    /* 地平線オーバーレイは画面中央に */
+    /* 地平線オーバーレイは画面中央に固定 */
     #horizon {
       position: fixed;
       top: 50%;
@@ -22,72 +22,68 @@
   <div id="horizon"></div>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
   <script>
-    // ── シーン & レンダラー ──
+    // ── シーン＆レンダラー ──
     const scene    = new THREE.Scene();
     scene.background = new THREE.Color(0xffffff);
     const renderer = new THREE.WebGLRenderer({ antialias:true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
-
-    window.addEventListener('resize', ()=>{
+    window.addEventListener('resize', () => {
       camera.aspect = window.innerWidth/window.innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
     });
 
-    // ── カメラ（Y=0 に固定） ──
+    // ── カメラ（地平線と同じ Y = 0 目線、左右パンのみ） ──
     const camera = new THREE.PerspectiveCamera(
       60, window.innerWidth/window.innerHeight, 0.1, 1000
     );
-    camera.position.set(0, 0, 30);      // ← Y 座標を 0（地平線と同じ高さ）に
+    camera.position.set(0, 0, 30);
     camera.lookAt(0, 0, 0);
 
-    // ── リング群パラメータ ──
+    const maxPanX = 100;
+    window.addEventListener('mousemove', e => {
+      const xn = (e.clientX / window.innerWidth) * 2 - 1;
+      camera.position.x = xn * maxPanX;
+      camera.lookAt(0, 0, 0);
+    });
+    window.addEventListener('touchmove', e => {
+      const xn = (e.touches[0].clientX / window.innerWidth) * 2 - 1;
+      camera.position.x = xn * maxPanX;
+      camera.lookAt(0, 0, 0);
+    });
+
+    // ── リング群の生成 ──
     const ringCount = 30,
           spacing   = 25,
-          farZ      = -spacing * ringCount,
-          majorR    = 5,      // リング半径
-          tubeR     = 0.5,    // リング厚み
+          farZ      = - spacing * ringCount,
+          majorR    = 5,
+          tubeR     = 0.5,
           xRange    = 100,
           speed     = 0.5;
     const rings = [];
 
-    // ── トーラス（車輪リング）生成 ──
     const geo = new THREE.TorusGeometry(majorR, tubeR, 16, 100);
-    const mat = new THREE.MeshBasicMaterial({
-      color: 0x000000,
-      side: THREE.DoubleSide
-    });
+    const mat = new THREE.MeshBasicMaterial({ color:0x000000, side:THREE.DoubleSide });
 
     for (let i = 0; i < ringCount; i++) {
       const wheel = new THREE.Mesh(geo, mat);
 
-      // 車輪の向きに立てる
+      // 純粋に X 軸で 90° 回転 → 車輪の向きに立てる
       wheel.rotation.x = Math.PI / 2;
 
-      // 底面が Y=0 の地平線に接する
-      wheel.position.y = majorR;
+      // 中心を地平線 Y=0 に → 底面は Y=-majorR に
+      wheel.position.y = 0;
 
-      wheel.position.z = -spacing * (i + 1);
+      wheel.position.z = - spacing * (i + 1);
       wheel.position.x = Math.random() * 2 * xRange - xRange;
 
       scene.add(wheel);
       rings.push(wheel);
     }
 
-    // ── マウス／タッチで左右パンのみ ──
-    const maxPanX = xRange;
-    function onPointerMove(e) {
-      const cx = e.clientX ?? e.touches[0].clientX;
-      const xn = (cx / window.innerWidth) * 2 - 1;
-      camera.position.x = xn * maxPanX;
-      camera.lookAt(0, 0, 0);
-    }
-    window.addEventListener('mousemove', onPointerMove);
-    window.addEventListener('touchmove',  onPointerMove);
-
     // ── アニメーションループ ──
-    (function animate() {
+    (function animate(){
       requestAnimationFrame(animate);
       rings.forEach(w => {
         w.position.z += speed;
