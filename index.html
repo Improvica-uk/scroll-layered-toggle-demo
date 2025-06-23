@@ -11,66 +11,76 @@
 <body>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script>
-    // シーン＆レンダラー
+    // シーン & レンダラー
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0xffffff);
     const renderer = new THREE.WebGLRenderer({ antialias:true });
-    renderer.setSize(innerWidth, innerHeight);
+    renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
-    // カメラ（水平を保つ lookAt）
-    const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 1000);
+    // カメラ（ピッチは水平0°固定）
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 1000);
     camera.position.set(0, 10, 30);
     camera.lookAt(0, camera.position.y, 0);
 
-    window.addEventListener('resize', ()=> {
-      camera.aspect = innerWidth/innerHeight;
+    window.addEventListener('resize', ()=>{
+      camera.aspect = window.innerWidth/window.innerHeight;
       camera.updateProjectionMatrix();
-      renderer.setSize(innerWidth, innerHeight);
+      renderer.setSize(window.innerWidth, window.innerHeight);
     });
 
-    // 地平線ライン
-    const horizonGeo = new THREE.BufferGeometry().setFromPoints([
-      new THREE.Vector3(-1000,0,0), new THREE.Vector3(1000,0,0)
+    // 地平線ライン (y=0, z=0 上の水平線)
+    const lineGeo = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-1000, 0, 0),
+      new THREE.Vector3( 1000, 0, 0)
     ]);
-    scene.add(new THREE.Line(horizonGeo, new THREE.LineBasicMaterial({color:0x000000})));
+    const lineMat = new THREE.LineBasicMaterial({ color: 0x000000 });
+    scene.add(new THREE.Line(lineGeo, lineMat));
 
-    // リング群
-    const ringCount = 10, spacing = 25, farZ = -spacing*ringCount, outerR = 5, rings=[];
-    const geo = new THREE.RingGeometry(outerR-0.5, outerR, 64);
-    const mat = new THREE.MeshBasicMaterial({ color:0x000000, side:THREE.DoubleSide });
+    // リング群の生成
+    const ringCount = 10;
+    const spacing   = 25;
+    const farZ      = - spacing * ringCount;
+    const outerR    = 5;   // 外半径
+    const rings     = [];
 
-    for(let i=0;i<ringCount;i++){
-      const m = new THREE.Mesh(geo, mat);
-      m.rotation.x = Math.PI/2;               // ← この１行を入れて「縦に立てる」
-      m.position.y = outerR;                  // 底が y=0 に接着
-      m.position.z = -spacing*(i+1);
-      m.position.x = Math.random()*20-10;
-      scene.add(m);
-      rings.push(m);
+    const ringGeo = new THREE.RingGeometry(outerR - 0.5, outerR, 64);
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: 0x000000,
+      side: THREE.DoubleSide
+    });
+
+    for (let i = 0; i < ringCount; i++) {
+      const ring = new THREE.Mesh(ringGeo, ringMat);
+      //  rotation.x は使わず、デフォルト向き（XY平面＝垂直）
+      ring.position.y = outerR;                  // 底面が y=0 に接着
+      ring.position.z = - spacing * (i + 1);
+      ring.position.x = (Math.random() * 20) - 10; // ランダム X
+      scene.add(ring);
+      rings.push(ring);
     }
 
-    // マウスでカメラパン＆チルト（ピッチは常に0）
-    const maxX=20, maxY=5;
-    function onMove(e){
-      const x = (e.clientX||e.touches[0].clientX)/innerWidth*2-1;
-      const y = (e.clientY||e.touches[0].clientY)/innerHeight*2-1;
-      camera.position.x = x*maxX;
-      camera.position.y = outerR + y*maxY;
+    // マウス / タッチでカメラ横パン & 高さ調整（ピッチは常に 0°）
+    const maxPanX = 20, maxPanY = 5;
+    function onPointerMove(e) {
+      const x = (e.clientX||e.touches[0].clientX)  / window.innerWidth  * 2 - 1;
+      const y = (e.clientY||e.touches[0].clientY)  / window.innerHeight * 2 - 1;
+      camera.position.x = x * maxPanX;
+      camera.position.y = outerR + y * maxPanY;
       camera.lookAt(0, camera.position.y, 0);
     }
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('touchmove', onMove);
+    window.addEventListener('mousemove', onPointerMove);
+    window.addEventListener('touchmove',  onPointerMove);
 
-    // アニメーション
+    // アニメーションループ
     const speed = 0.5;
-    (function loop(){
-      requestAnimationFrame(loop);
-      rings.forEach(r=>{
-        r.position.z += speed;
-        if(r.position.z > camera.position.z-1){
-          r.position.z = farZ;
-          r.position.x = Math.random()*20-10;
+    (function animate() {
+      requestAnimationFrame(animate);
+      rings.forEach(ring => {
+        ring.position.z += speed;
+        if (ring.position.z > camera.position.z - 1) {
+          ring.position.z = farZ;
+          ring.position.x = (Math.random() * 20) - 10;
         }
       });
       renderer.render(scene, camera);
