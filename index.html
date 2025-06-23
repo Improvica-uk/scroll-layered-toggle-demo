@@ -2,64 +2,53 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>Scroll-Triggered Oscillator Demo</title>
+  <title>iOS Safari 対応ローンチボタン付きデモ</title>
   <style>
-    html, body { margin:0; padding:0; }
-    section {
-      height:100vh;
-      display:flex; justify-content:center; align-items:center;
-      font-size:2rem; background:#333; color:#fff;
+    html,body { margin:0; padding:0; }
+    #unlock {
+      position: fixed; top:10px; left:10px;
+      padding:8px 12px; font-size:16px;
+      z-index:100;
     }
-    section:nth-child(1) { background:#1e1e1e; }
-    section:nth-child(2) { background:#2e2e2e; }
-    section:nth-child(3) { background:#3e3e3e; }
-    #hint {
-      position:fixed; top:10px; left:10px;
-      background:rgba(0,0,0,0.6); color:#fff;
-      padding:8px; border-radius:4px; z-index:10;
-    }
+    section { height:100vh; }
   </style>
 </head>
 <body>
-  <div id="hint">▶︎ まず画面をタップ → スクロールで音が変わります</div>
-  <section>Section 1</section>
-  <section>Section 2</section>
-  <section>Section 3</section>
+  <button id="unlock">▶︎ Tap to Enable Sound</button>
+
+  <section id="one"   style="background:#aac;">セクション１</section>
+  <section id="two"   style="background:#aca;">セクション２</section>
+  <section id="three" style="background:#aac;">セクション３</section>
+
+  <audio id="audio1" src="sound1.mp3" preload="auto"></audio>
+  <audio id="audio2" src="sound2.mp3" preload="auto"></audio>
+  <audio id="audio3" src="sound3.mp3" preload="auto"></audio>
 
   <script>
-    // AudioContext を suspension で用意
-    const AudioCtx = window.AudioContext || window.webkitAudioContext;
-    let audioCtx, osc, currentSection = -1;
+    const audios = {
+      one:   document.getElementById('audio1'),
+      two:   document.getElementById('audio2'),
+      three: document.getElementById('audio3'),
+    };
 
-    // 最初のタップで resume() して unlock
-    document.body.addEventListener('pointerdown', () => {
-      if (!audioCtx) {
-        audioCtx = new AudioCtx();
-        audioCtx.resume();
-        document.getElementById('hint').style.display = 'none';
-      }
-    }, { once: true });
+    // まずはアンロックボタン
+    document.getElementById('unlock')
+      .addEventListener('click', () => {
+        // ユーザー操作の中で各 audio.play()
+        Object.values(audios).forEach(a => {
+          a.play().catch(()=>{});  // promise rejection は無視
+        });
+        // ボタンはもう要らないので消す
+        document.getElementById('unlock').remove();
+      }, { once: true });
 
-    // 各セクションで鳴らす周波数
-    const freqs = [440, 554.37, 659.25];
-
+    // 以降はスクロールで鳴らす例
     window.addEventListener('scroll', () => {
-      if (!audioCtx) return;
-      // 今どのセクションにいるか判定
-      const idx = Math.floor(window.scrollY / window.innerHeight);
-      if (idx !== currentSection) {
-        currentSection = idx;
-        // 既存のオシレーターを停止
-        if (osc) osc.stop();
-        // 範囲外は何もしない
-        if (idx < 0 || idx > 2) return;
-        // 新しいオシレーターを作成・再生
-        osc = audioCtx.createOscillator();
-        osc.type = 'sine';
-        osc.frequency.value = freqs[idx];
-        osc.connect(audioCtx.destination);
-        osc.start();
-      }
+      const y = window.scrollY;
+      const h = window.innerHeight;
+      if (y >= 0   && y <   h)    audios.one.play();
+      if (y >= h   && y < 2*h)    audios.two.play();
+      if (y >= 2*h && y < 3*h)    audios.three.play();
     });
   </script>
 </body>
