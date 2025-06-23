@@ -40,11 +40,11 @@
     camera.lookAt(0, 0, 0);
 
     // リング群パラメータ
-    const ringCount = 30,
+    const ringCount = 300,
           spacing   = 25,
           farZ      = - spacing * ringCount,
           majorR    = 5,    // リングの“半径”
-          tubeR     = 0.5,  // リングの“厚み”
+          tubeR     = 0.2,  // リングの“厚み”
           xRange    = 100,
           speed     = 0.5;
     const rings = [];
@@ -58,7 +58,7 @@
 
       // ★ここで純粋に X 軸まわりに90°回転★
       wheel.rotation.x = Math.PI / 2;
-      wheel.rotation.y = Math.PI / 2;
+      wheel.rotation.y = Math.PI / 1.5;
 
       // 中心を地平線の少し上に：底面は必ず horizon より上
       wheel.position.y = majorR + tubeR;
