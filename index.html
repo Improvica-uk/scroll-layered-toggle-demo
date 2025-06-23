@@ -2,13 +2,13 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <title>Three.js – 車輪のように立ったリング＋下寄せ地平線</title>
+  <title>Three.js – 純粋に90°回転した車輪リング</title>
   <style>
     body { margin:0; overflow:hidden; }
-    /* 地平線オーバーレイを画面高さの25%位置に */
+    /* 地平線を画面中央に固定 */
     #horizon {
       position: fixed;
-      top: 25%;       /* ← ここを50%→25%に */
+      top: 50%;
       left: 0;
       width: 100%;
       border-top: 1px solid #000;
@@ -19,13 +19,11 @@
   </style>
 </head>
 <body>
-  <!-- 画面中央から少し下（1/4の位置）に水平線 -->
   <div id="horizon"></div>
-
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
   <script>
-    // ■ シーン＆レンダラー
-    const scene    = new THREE.Scene();
+    // シーン＆レンダラー
+    const scene = new THREE.Scene();
     scene.background = new THREE.Color(0xffffff);
     const renderer = new THREE.WebGLRenderer({ antialias:true });
     renderer.setSize(window.innerWidth, window.innerHeight);
@@ -36,48 +34,66 @@
       renderer.setSize(window.innerWidth, window.innerHeight);
     });
 
-    // ■ カメラ
-    const camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 1000);
+    // カメラ（水平ピッチ0°固定で地平線下の原点を注視）
+    const camera = new THREE.PerspectiveCamera(
+      60, window.innerWidth/window.innerHeight, 0.1, 1000
+    );
     camera.position.set(0, 10, 30);
-    camera.lookAt(0, camera.position.y, 0);
+    camera.lookAt(0, 0, 0);
 
-    // ■ リング群（車輪の向きで立たせる）
-    const ringCount = 30, spacing = 25, farZ = -spacing*ringCount, majorR = 5, tubeR = 0.5, xRange = 100, speed = 0.5;
+    // リング群パラメータ
+    const ringCount = 30,
+          spacing   = 25,
+          farZ      = - spacing * ringCount,
+          majorR    = 5,
+          tubeR     = 0.5,
+          xRange    = 100,
+          speed     = 0.5;
     const rings = [];
+
+    // トーラスジオメトリ＆マテリアル
     const geo = new THREE.TorusGeometry(majorR, tubeR, 16, 100);
     const mat = new THREE.MeshBasicMaterial({ color:0x000000, side:THREE.DoubleSide });
+
+    // 配置ループ
     for (let i = 0; i < ringCount; i++) {
       const wheel = new THREE.Mesh(geo, mat);
-      wheel.rotation.y = Math.PI/2;    // 車輪の向きに立てる
-      wheel.position.y = majorR;        // 底を y=0 に接着
-      wheel.position.z = -spacing*(i+1);
-      wheel.position.x = Math.random()*2*xRange - xRange;
+
+      // ← X 軸回転で純粋に90°車輪状態に
+      wheel.rotation.x = Math.PI / 2;
+
+      // 底が地平線 y=0 に接する
+      wheel.position.y = majorR;
+
+      wheel.position.z = -spacing * (i + 1);
+      wheel.position.x = Math.random() * 2 * xRange - xRange;
+
       scene.add(wheel);
       rings.push(wheel);
     }
 
-    // ■ マウス/タッチでパン＆高さ調整
+    // マウス／タッチでパン＆高さ調整
     const maxPanX = xRange, maxPanY = 5;
-    function onPointerMove(e) {
+    function onMove(e) {
       const cx = e.clientX ?? e.touches[0].clientX;
       const cy = e.clientY ?? e.touches[0].clientY;
       const xn = (cx/window.innerWidth)*2 - 1;
       const yn = (cy/window.innerHeight)*2 - 1;
       camera.position.x = xn * maxPanX;
       camera.position.y = majorR + yn * maxPanY;
-      camera.lookAt(0, camera.position.y, 0);
+      camera.lookAt(0, 0, 0);
     }
-    window.addEventListener('mousemove', onPointerMove);
-    window.addEventListener('touchmove',  onPointerMove);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('touchmove',  onMove);
 
-    // ■ アニメーションループ
+    // アニメーションループ
     (function animate(){
       requestAnimationFrame(animate);
       rings.forEach(w => {
         w.position.z += speed;
         if (w.position.z > camera.position.z - 1) {
           w.position.z = farZ;
-          w.position.x = Math.random()*2*xRange - xRange;
+          w.position.x = Math.random() * 2 * xRange - xRange;
         }
       });
       renderer.render(scene, camera);
