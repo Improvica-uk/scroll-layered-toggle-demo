@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <title>Three.js – チルトした立体トーラスリング</title>
+  <title>Three.js – 視点に正面を向ける立つリング</title>
   <style>
     body { margin:0; overflow:hidden; }
     #horizon {
@@ -18,54 +18,57 @@
   </style>
 </head>
 <body>
-  <!-- 画面中央に水平な地平線オーバーレイ -->
   <div id="horizon"></div>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
   <script>
-    // シーン・カメラ・レンダラー
+    // ■ セットアップ
     const scene    = new THREE.Scene();
     scene.background = new THREE.Color(0xffffff);
-    const camera   = new THREE.PerspectiveCamera( 60, innerWidth/innerHeight, 0.1, 1000 );
     const renderer = new THREE.WebGLRenderer({ antialias:true });
     renderer.setSize(innerWidth, innerHeight);
     document.body.appendChild(renderer.domElement);
-    window.addEventListener('resize', ()=>{
+
+    window.addEventListener('resize', () => {
       camera.aspect = innerWidth/innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(innerWidth, innerHeight);
     });
 
-    // カメラ初期位置（水平ピッチ0°）
+    // ■ カメラ（水平ピッチ0°固定）
+    const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 1000);
     camera.position.set(0, 10, 30);
     camera.lookAt(0, camera.position.y, 0);
 
-    // トーラスリング群
+    // ■ リングのパラメータ
     const ringCount = 30,
           spacing   = 25,
-          farZ      = -spacing * ringCount,
-          majorR    = 5,
-          tubeR     = 0.5,
+          farZ      = - spacing * ringCount,
+          majorR    = 5,    // リング中心の高さ
+          tubeR     = 0.5,  // リングの厚み
           xRange    = 100,
-          rings     = [];
+          speed     = 0.5;
 
+    // ■ 地平線は HTML/CSS で固定
+    // （Three.js 内にはラインを置かず、画面中央にオーバーレイ）
+
+    // ■ トーラスジオメトリで厚みのあるリング
     const geo = new THREE.TorusGeometry(majorR, tubeR, 16, 100);
-    const mat = new THREE.MeshBasicMaterial({ color:0x000000, side:THREE.DoubleSide });
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0x000000, side: THREE.DoubleSide
+    });
+    const rings = [];
 
     for (let i = 0; i < ringCount; i++) {
       const m = new THREE.Mesh(geo, mat);
-      // 地平線に垂直に立てる
-      m.rotation.y = Math.PI / 2;
-      // さらに手前へ傾ける（X軸まわり45°チルト）
-      m.rotation.x = Math.PI / 4;
-      // 底面が地平線（y=0）に接するように高さを設定
-      m.position.y = majorR * Math.cos(Math.PI/4);
-      m.position.z = -spacing * (i + 1);
-      m.position.x = Math.random() * 2 * xRange - xRange;
+      // 初期位置だけ設定。向きは毎フレーム更新。
+      m.position.y = majorR;              
+      m.position.z = - spacing * (i + 1);
+      m.position.x = (Math.random()*2*xRange) - xRange;
       scene.add(m);
       rings.push(m);
     }
 
-    // マウス／タッチでパン＆高さ調整
+    // ■ マウス／タッチでカメラ横パン＆高さ調整
     const maxPanX = xRange, maxPanY = 5;
     function onMove(e) {
       const cx = e.clientX ?? e.touches[0].clientX;
@@ -77,19 +80,27 @@
       camera.lookAt(0, camera.position.y, 0);
     }
     window.addEventListener('mousemove', onMove);
-    window.addEventListener('touchmove', onMove);
+    window.addEventListener('touchmove',  onMove);
 
-    // アニメーションループ
-    const speed = 0.5;
-    (function loop(){
-      requestAnimationFrame(loop);
+    // ■ アニメーション
+    (function animate() {
+      requestAnimationFrame(animate);
+
       rings.forEach(r => {
+        // 1) カメラ位置に応じて Y軸回転を合わせる
+        const dx = camera.position.x - r.position.x;
+        const dz = camera.position.z - r.position.z;
+        const theta = Math.atan2(dx, dz);
+        r.rotation.set(0, theta, 0);
+
+        // 2) 手前に移動し、超えたら奥へループ
         r.position.z += speed;
         if (r.position.z > camera.position.z - 1) {
           r.position.z = farZ;
-          r.position.x = Math.random()*2*xRange - xRange;
+          r.position.x = (Math.random()*2*xRange) - xRange;
         }
       });
+
       renderer.render(scene, camera);
     })();
   </script>
