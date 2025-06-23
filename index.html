@@ -2,65 +2,72 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>Scroll-Triggered Oscillator Demo</title>
+  <title>Three.js – ループするリングのアニメーション</title>
   <style>
-    html, body { margin:0; padding:0; }
-    section {
-      height:100vh;
-      display:flex; justify-content:center; align-items:center;
-      font-size:2rem; background:#333; color:#fff;
-    }
-    section:nth-child(1) { background:#1e1e1e; }
-    section:nth-child(2) { background:#2e2e2e; }
-    section:nth-child(3) { background:#3e3e3e; }
-    #hint {
-      position:fixed; top:10px; left:10px;
-      background:rgba(0,0,0,0.6); color:#fff;
-      padding:8px; border-radius:4px; z-index:10;
-    }
+    body { margin: 0; overflow: hidden; }
+    canvas { display: block; }
   </style>
 </head>
 <body>
-  <div id="hint">▶︎ まず画面をタップ → スクロールで音が変わります</div>
-  <section>Section 1</section>
-  <section>Section 2</section>
-  <section>Section 3</section>
-
+  <!-- Three.js を CDN から読み込み -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script>
-    // AudioContext を suspension で用意
-    const AudioCtx = window.AudioContext || window.webkitAudioContext;
-    let audioCtx, osc, currentSection = -1;
+    // ■ シーン／カメラ／レンダラーの基本セットアップ
+    const scene    = new THREE.Scene();
+    scene.background = new THREE.Color(0xffffff); // 背景白
 
-    // 最初のタップで resume() して unlock
-    document.body.addEventListener('pointerdown', () => {
-      if (!audioCtx) {
-        audioCtx = new AudioCtx();
-        audioCtx.resume();
-        document.getElementById('hint').style.display = 'none';
-      }
-    }, { once: true });
+    const camera = new THREE.PerspectiveCamera(
+      60, window.innerWidth / window.innerHeight, 0.1, 1000
+    );
+    camera.position.z = 0;
 
-    // 各セクションで鳴らす周波数
-    const freqs = [440, 554.37, 659.25];
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
 
-    window.addEventListener('scroll', () => {
-      if (!audioCtx) return;
-      // 今どのセクションにいるか判定
-      const idx = Math.floor(window.scrollY / window.innerHeight);
-      if (idx !== currentSection) {
-        currentSection = idx;
-        // 既存のオシレーターを停止
-        if (osc) osc.stop();
-        // 範囲外は何もしない
-        if (idx < 0 || idx > 2) return;
-        // 新しいオシレーターを作成・再生
-        osc = audioCtx.createOscillator();
-        osc.type = 'sine';
-        osc.frequency.value = freqs[idx];
-        osc.connect(audioCtx.destination);
-        osc.start();
-      }
+    // ■ リングを作成
+    const ringCount = 10;
+    const spacing   = 10;    // リング同士の距離
+    const farZ      = - spacing * ringCount; // 最遠位置
+
+    const rings = [];
+
+    const geometry = new THREE.RingGeometry(4.5, 5, 64);
+    const material = new THREE.MeshBasicMaterial({
+      color: 0x000000,        // 黒
+      side: THREE.DoubleSide
     });
+
+    for (let i = 0; i < ringCount; i++) {
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.position.z = - spacing * (i + 1);
+      scene.add(mesh);
+      rings.push(mesh);
+    }
+
+    // ■ リサイズ対応
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // ■ アニメーションループ
+    const speed = 0.2;
+    function animate() {
+      requestAnimationFrame(animate);
+
+      rings.forEach(mesh => {
+        mesh.position.z += speed;
+        // カメラの前を通り過ぎたら奥にループ
+        if (mesh.position.z > 1) {
+          mesh.position.z = farZ;
+        }
+      });
+
+      renderer.render(scene, camera);
+    }
+    animate();
   </script>
 </body>
 </html>
