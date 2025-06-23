@@ -2,25 +2,19 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>Three.js – 地平線＋垂直リング＋カメラ操作</title>
+  <title>Three.js – 水平カメラ＋垂直リング＋地平線</title>
   <style>
-    body { margin:0; overflow:hidden; }
-    canvas { display:block; }
+    body { margin: 0; overflow: hidden; }
+    canvas { display: block; }
   </style>
 </head>
 <body>
-  <!-- Three.js -->
+  <!-- three.js を CDN から読み込み -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script>
-    // ■ シーン／カメラ／レンダラー
+    // ─── シーンとレンダラー ───
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0xffffff);
-
-    const camera = new THREE.PerspectiveCamera(
-      60, window.innerWidth / window.innerHeight, 0.1, 1000
-    );
-    camera.position.set(0, 10, 30);
-    camera.lookAt(0, 0, 0);
 
     const renderer = new THREE.WebGLRenderer({ antialias:true });
     renderer.setSize(window.innerWidth, window.innerHeight);
@@ -32,7 +26,15 @@
       renderer.setSize(window.innerWidth, window.innerHeight);
     });
 
-    // ■ 地平線ライン（y=0）
+    // ─── カメラ ───
+    const camera = new THREE.PerspectiveCamera(
+      60, window.innerWidth / window.innerHeight, 0.1, 1000
+    );
+    camera.position.set(0, 10, 30);
+    // ピッチ（X回転）を 0 に保つため、水平に真っ直ぐ前を見る
+    camera.lookAt(0, camera.position.y, 0);
+
+    // ─── 地平線 ───
     const horizonGeo = new THREE.BufferGeometry().setFromPoints([
       new THREE.Vector3(-1000, 0, 0),
       new THREE.Vector3( 1000, 0, 0)
@@ -40,11 +42,11 @@
     const horizonMat = new THREE.LineBasicMaterial({ color:0x000000 });
     scene.add(new THREE.Line(horizonGeo, horizonMat));
 
-    // ■ リング群の生成
+    // ─── リング群 ───
     const ringCount   = 10;
     const spacing     = 25;
     const farZ        = - spacing * ringCount;
-    const outerRadius = 5;    
+    const outerRadius = 5;  // リングの外半径
     const rings       = [];
 
     const ringGeo = new THREE.RingGeometry(outerRadius - 0.5, outerRadius, 64);
@@ -55,29 +57,33 @@
 
     for (let i = 0; i < ringCount; i++) {
       const mesh = new THREE.Mesh(ringGeo, ringMat);
-      // デフォルトXY平面 → 垂直リング
-      mesh.position.y = outerRadius;               // 底が y=0 に接着
+      // デフォルト XY 平面のままなので垂直に立つ
+      mesh.position.y = outerRadius;                // 底が y=0 に接着
       mesh.position.z = - spacing * (i + 1);
-      mesh.position.x = (Math.random() * 20) - 10;  // ランダム X
+      mesh.position.x = (Math.random() * 20) - 10;   // ランダム X
       scene.add(mesh);
       rings.push(mesh);
     }
 
-    // ■ カメラ操作（マウス移動／タッチ移動）
-    const maxX = 20, maxY = 10;
+    // ─── カメラ操作（水平パンのみ） ───
+    const maxX = 20, maxY = 5;
     function onPointerMove(e) {
       let x = e.clientX, y = e.clientY;
-      if (e.touches) { x = e.touches[0].clientX; y = e.touches[0].clientY; }
+      if (e.touches) {
+        x = e.touches[0].clientX;
+        y = e.touches[0].clientY;
+      }
       const xn = (x / window.innerWidth)  * 2 - 1;
       const yn = (y / window.innerHeight) * 2 - 1;
       camera.position.x = xn * maxX;
       camera.position.y = outerRadius + yn * maxY;
-      camera.lookAt(0, 0, 0);
+      // 常に水平ピッチを維持 → 注視点の Y はカメラ自身と同じ
+      camera.lookAt(0, camera.position.y, 0);
     }
     window.addEventListener('mousemove', onPointerMove);
-    window.addEventListener('touchmove', onPointerMove);
+    window.addEventListener('touchmove',  onPointerMove);
 
-    // ■ アニメーションループ
+    // ─── アニメーションループ ───
     const speed = 0.5;
     (function animate() {
       requestAnimationFrame(animate);
