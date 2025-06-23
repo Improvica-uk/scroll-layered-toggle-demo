@@ -2,15 +2,13 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <title>立ったリング＋固定地平線デモ</title>
+  <title>リング通過で効果音デモ</title>
   <style>
     body { margin:0; overflow:hidden; }
-    /* 地平線を画面中央に固定 */
     #horizon {
       position: fixed;
       top: 50%;
-      left: 0;
-      width: 100%;
+      left: 0; width: 100%;
       border-top: 1px solid #000;
       pointer-events: none;
       z-index: 10;
@@ -19,80 +17,106 @@
   </style>
 </head>
 <body>
+  <!-- 地平線オーバーレイ -->
   <div id="horizon"></div>
+  <!-- 効果音用オーディオ要素 -->
+  <audio id="ding" src="ding.mp3" preload="auto"></audio>
+
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
   <script>
-    // シーン＆レンダラー
+    // ─── シーン & レンダラー ───
     const scene    = new THREE.Scene();
     scene.background = new THREE.Color(0xffffff);
     const renderer = new THREE.WebGLRenderer({ antialias:true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setSize(innerWidth, innerHeight);
     document.body.appendChild(renderer.domElement);
-    window.addEventListener('resize', () => {
-      camera.aspect = window.innerWidth/window.innerHeight;
+    window.addEventListener('resize', ()=>{
+      camera.aspect = innerWidth/innerHeight;
       camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setSize(innerWidth, innerHeight);
     });
 
-    // カメラ（地平線を見据える）
-    const camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 1000);
+    // ─── カメラ ───
+    const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 1000);
     camera.position.set(0, 10, 30);
     camera.lookAt(0, 0, 0);
 
-    // リング群パラメータ
-    const ringCount = 500,
+    // ─── リング群パラメータ ───
+    const ringCount = 100,
           spacing   = 25,
           farZ      = - spacing * ringCount,
-          majorR    = 5,    // リングの“半径”
-          tubeR     = 0.2,  // リングの“厚み”
+          majorR    = 5,
+          tubeR     = 0.2,
           xRange    = 100,
           speed     = 0.5;
     const rings = [];
 
-    // トーラスジオメトリ／マテリアル
+    // ─── ジオメトリ & マテリアル ───
     const geo = new THREE.TorusGeometry(majorR, tubeR, 16, 100);
     const mat = new THREE.MeshBasicMaterial({ color:0x000000, side:THREE.DoubleSide });
 
     for (let i = 0; i < ringCount; i++) {
       const wheel = new THREE.Mesh(geo, mat);
-
-      // ★ここで純粋に X 軸まわりに90°回転★
-      wheel.rotation.x = Math.PI / 2;
-      wheel.rotation.y = Math.PI / 1.5;
-
-      // 中心を地平線の少し上に：底面は必ず horizon より上
-      wheel.position.y = majorR + tubeR;
-
-      wheel.position.z = - spacing * (i + 1);
-      wheel.position.x = Math.random() * 2 * xRange - xRange;
-
+      wheel.rotation.x = Math.PI/2;           // 垂直に立てる
+      wheel.position.y = majorR + tubeR;      // 中心を少し上に
+      wheel.position.z = - spacing*(i+1);
+      wheel.position.x = Math.random()*2*xRange - xRange;
+      // 通過判定用フラグ
+      wheel.userData.aboveHorizon = true;
       scene.add(wheel);
       rings.push(wheel);
     }
 
-    // 左右パンだけを許可
-    const maxPanX = xRange;
-    window.addEventListener('mousemove', e => {
-      const xn = (e.clientX / window.innerWidth) * 2 - 1;
-      camera.position.x = xn * maxPanX;
-      camera.lookAt(0, 0, 0);
-    });
-    window.addEventListener('touchmove', e => {
-      const xn = (e.touches[0].clientX / window.innerWidth) * 2 - 1;
-      camera.position.x = xn * maxPanX;
-      camera.lookAt(0, 0, 0);
-    });
+    // ─── 効果音の再生関数 ───
+    const ding = document.getElementById('ding');
+    function playDing() {
+      // ユーザー操作後にしか再生できないブラウザが多いので、念のため再生をリセット
+      ding.currentTime = 0;
+      ding.play();
+    }
 
-    // アニメーションループ
-    (function animate(){
+    // ─── リングのスクリーン上 Y(NDC)をチェックする関数 ───
+    const v = new THREE.Vector3();
+    function isAboveHorizon(mesh) {
+      // ワールド座標を正規化デバイス座標に投影
+      v.copy(mesh.position).project(camera);
+      // NDC の Y=0 が “画面中央” → y>0 は上、y<0 は下
+      return v.y > 0;
+    }
+
+    // ─── 左右パンのみ ───
+    const maxPanX = xRange;
+    function onMove(e) {
+      const x = ((e.clientX ?? e.touches[0].clientX) / innerWidth)*2 - 1;
+      camera.position.x = x * maxPanX;
+      camera.lookAt(0,0,0);
+    }
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('touchmove', onMove);
+
+    // ─── アニメーションループ ───
+    (function animate() {
       requestAnimationFrame(animate);
-      rings.forEach(w => {
-        w.position.z += speed;
-        if (w.position.z > camera.position.z - 1) {
-          w.position.z = farZ;
-          w.position.x = Math.random() * 2 * xRange - xRange;
+
+      rings.forEach(r => {
+        // 1) リングを前に動かす
+        r.position.z += speed;
+        if (r.position.z > camera.position.z - 1) {
+          r.position.z = farZ;
+          r.position.x = Math.random()*2*xRange - xRange;
+          // 通過フラグをリセット
+          r.userData.aboveHorizon = true;
         }
+
+        // 2) スクリーン上で地平線を跨いだか判定
+        const nowAbove = isAboveHorizon(r);
+        if (r.userData.aboveHorizon && !nowAbove) {
+          // 上から下へ跨いだ瞬間に音を鳴らす
+          playDing();
+        }
+        r.userData.aboveHorizon = nowAbove;
       });
+
       renderer.render(scene, camera);
     })();
   </script>
