@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>Three.js – 垂直リング＋地平線＋マウスカメラ</title>
+  <title>Three.js – 地平線に立つリング＋マウスカメラ</title>
   <style>
     body { margin:0; overflow:hidden; }
     canvas { display:block; }
@@ -11,67 +11,74 @@
 <body>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script>
-    // シーン＆レンダラー
+    // ■ シーン＆レンダラー
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0xffffff);
-    const renderer = new THREE.WebGLRenderer({ antialias:true });
-    renderer.setSize(innerWidth, innerHeight);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
-    // カメラ（水平ピッチ 0°）
-    const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 1000);
+    window.addEventListener('resize', ()=>{
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // ■ カメラ（水平ピッチ0°固定）
+    const camera = new THREE.PerspectiveCamera(
+      60, window.innerWidth / window.innerHeight, 0.1, 1000
+    );
     camera.position.set(0, 10, 30);
     camera.lookAt(0, camera.position.y, 0);
 
-    window.addEventListener('resize', () => {
-      camera.aspect = innerWidth/innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(innerWidth, innerHeight);
-    });
+    // ■ 地平線ライン (y=0, X軸方向)
+    const lineGeo = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-1000, 0, 0),
+      new THREE.Vector3( 1000, 0, 0)
+    ]);
+    const lineMat = new THREE.LineBasicMaterial({ color: 0x000000 });
+    scene.add(new THREE.Line(lineGeo, lineMat));
 
-    // 地平線ライン (y=0)
-    const horizon = new THREE.Line(
-      new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(-1000,0,0),
-        new THREE.Vector3( 1000,0,0)
-      ]),
-      new THREE.LineBasicMaterial({ color:0x000000 })
-    );
-    scene.add(horizon);
+    // ■ リング群の作成
+    const ringCount = 30;
+    const spacing   = 25;
+    const farZ      = - spacing * ringCount;
+    const outerR    = 5;
+    const xRange    = 100;
+    const rings     = [];
 
-    // リング群
-    const ringCount = 30,
-          spacing   = 25,
-          farZ      = -spacing * ringCount,
-          outerR    = 5,
-          xRange    = 100;
-    const rings = [];
     const ringGeo = new THREE.RingGeometry(outerR - 0.5, outerR, 64);
-    const ringMat = new THREE.MeshBasicMaterial({ color:0x000000, side:THREE.DoubleSide });
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: 0x000000,
+      side: THREE.DoubleSide
+    });
 
     for (let i = 0; i < ringCount; i++) {
       const ring = new THREE.Mesh(ringGeo, ringMat);
-      ring.rotation.x = Math.PI / 2;      // ← ここでリングを立てる！
-      ring.position.y = outerR;           // 底面が y=0 に接着
-      ring.position.z = -spacing * (i + 1);
+      // ここで「Y軸回転」でリング面を地平線に対して垂直にする
+      ring.rotation.y = Math.PI / 2;
+      ring.position.y = outerR;                     // 底面が y=0 に接着
+      ring.position.z = - spacing * (i + 1);
       ring.position.x = Math.random() * 2 * xRange - xRange;
       scene.add(ring);
       rings.push(ring);
     }
 
-    // マウス／タッチでカメラ横パン＆高さ調整
+    // ■ マウス／タッチでパン＆高さ調整（ピッチは常に 0°）
     const maxPanX = xRange, maxPanY = 5;
     function onPointerMove(e) {
-      const x  = ((e.clientX||e.touches[0].clientX) / innerWidth)  * 2 - 1;
-      const y  = ((e.clientY||e.touches[0].clientY) / innerHeight) * 2 - 1;
-      camera.position.x = x * maxPanX;
-      camera.position.y = outerR + y * maxPanY;
+      const cx = e.clientX ?? e.touches[0].clientX;
+      const cy = e.clientY ?? e.touches[0].clientY;
+      const xn = (cx / window.innerWidth) * 2 - 1;
+      const yn = (cy / window.innerHeight) * 2 - 1;
+      camera.position.x = xn * maxPanX;
+      camera.position.y = outerR + yn * maxPanY;
       camera.lookAt(0, camera.position.y, 0);
     }
     window.addEventListener('mousemove', onPointerMove);
     window.addEventListener('touchmove',  onPointerMove);
 
-    // アニメーションループ
+    // ■ アニメーションループ
     const speed = 0.5;
     (function animate() {
       requestAnimationFrame(animate);
