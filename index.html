@@ -1,98 +1,93 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <title>Three.js + 固定地平線オーバーレイ</title>
+  <meta charset="UTF-8" />
+  <title>Three.js – チルトした立体トーラスリング</title>
   <style>
     body { margin:0; overflow:hidden; }
     #horizon {
       position: fixed;
-      top: 50%;       /* 画面中央に水平線を引く */
+      top: 50%;
       left: 0;
       width: 100%;
       border-top: 1px solid #000;
-      pointer-events: none; /* クリックを邪魔しない */
+      pointer-events: none;
       z-index: 10;
     }
-    canvas { display: block; }
+    canvas { display:block; }
   </style>
 </head>
 <body>
-  <!-- 固定地平線オーバーレイ -->
+  <!-- 画面中央に水平な地平線オーバーレイ -->
   <div id="horizon"></div>
-
-  <!-- Three.js -->
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
   <script>
-    // ■ シーン＆レンダラー
-    const scene = new THREE.Scene();
+    // シーン・カメラ・レンダラー
+    const scene    = new THREE.Scene();
     scene.background = new THREE.Color(0xffffff);
+    const camera   = new THREE.PerspectiveCamera( 60, innerWidth/innerHeight, 0.1, 1000 );
     const renderer = new THREE.WebGLRenderer({ antialias:true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setSize(innerWidth, innerHeight);
     document.body.appendChild(renderer.domElement);
-
-    // リサイズ対応
-    window.addEventListener('resize', () => {
-      camera.aspect = window.innerWidth/window.innerHeight;
+    window.addEventListener('resize', ()=>{
+      camera.aspect = innerWidth/innerHeight;
       camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setSize(innerWidth, innerHeight);
     });
 
-    // ■ カメラ（水平ピッチ0°固定）
-    const camera = new THREE.PerspectiveCamera(
-      60, window.innerWidth/window.innerHeight, 0.1, 1000
-    );
+    // カメラ初期位置（水平ピッチ0°）
     camera.position.set(0, 10, 30);
     camera.lookAt(0, camera.position.y, 0);
 
-    // ■ リング群の生成
-    const ringCount = 90;
-    const spacing   = 25;
-    const farZ      = - spacing * ringCount;
-    const majorR    = 2;
-    const tubeR     = 0.5;
-    const xRange    = 100;
-    const rings     = [];
+    // トーラスリング群
+    const ringCount = 30,
+          spacing   = 25,
+          farZ      = -spacing * ringCount,
+          majorR    = 5,
+          tubeR     = 0.5,
+          xRange    = 100,
+          rings     = [];
 
-    const torusGeo = new THREE.TorusGeometry(majorR, tubeR, 16, 100);
-    const torusMat = new THREE.MeshBasicMaterial({
-      color: 0x000000,
-      side: THREE.DoubleSide
-    });
+    const geo = new THREE.TorusGeometry(majorR, tubeR, 16, 100);
+    const mat = new THREE.MeshBasicMaterial({ color:0x000000, side:THREE.DoubleSide });
 
     for (let i = 0; i < ringCount; i++) {
-      const mesh = new THREE.Mesh(torusGeo, torusMat);
-      mesh.rotation.y = Math.PI / 2;      // 地平線に対して垂直に
-      mesh.position.y = majorR;           // 底面を y=0 に接着
-      mesh.position.z = - spacing * (i + 1);
-      mesh.position.x = (Math.random()*2*xRange) - xRange;
-      scene.add(mesh);
-      rings.push(mesh);
+      const m = new THREE.Mesh(geo, mat);
+      // 地平線に垂直に立てる
+      m.rotation.y = Math.PI / 2;
+      // さらに手前へ傾ける（X軸まわり45°チルト）
+      m.rotation.x = Math.PI / 4;
+      // 底面が地平線（y=0）に接するように高さを設定
+      m.position.y = majorR * Math.cos(Math.PI/4);
+      m.position.z = -spacing * (i + 1);
+      m.position.x = Math.random() * 2 * xRange - xRange;
+      scene.add(m);
+      rings.push(m);
     }
 
-    // ■ マウス／タッチでパン＆高さ調整（ピッチ0°）
+    // マウス／タッチでパン＆高さ調整
     const maxPanX = xRange, maxPanY = 5;
-    function onPointerMove(e) {
+    function onMove(e) {
       const cx = e.clientX ?? e.touches[0].clientX;
       const cy = e.clientY ?? e.touches[0].clientY;
-      const xn = (cx/window.innerWidth)*2 - 1;
-      const yn = (cy/window.innerHeight)*2 - 1;
+      const xn = (cx/innerWidth)*2 - 1;
+      const yn = (cy/innerHeight)*2 - 1;
       camera.position.x = xn * maxPanX;
       camera.position.y = majorR + yn * maxPanY;
       camera.lookAt(0, camera.position.y, 0);
     }
-    window.addEventListener('mousemove', onPointerMove);
-    window.addEventListener('touchmove',  onPointerMove);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('touchmove', onMove);
 
-    // ■ アニメーションループ
+    // アニメーションループ
     const speed = 0.5;
-    (function animate() {
-      requestAnimationFrame(animate);
+    (function loop(){
+      requestAnimationFrame(loop);
       rings.forEach(r => {
         r.position.z += speed;
         if (r.position.z > camera.position.z - 1) {
           r.position.z = farZ;
-          r.position.x = (Math.random()*2*xRange) - xRange;
+          r.position.x = Math.random()*2*xRange - xRange;
         }
       });
       renderer.render(scene, camera);
